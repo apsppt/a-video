@@ -155,7 +155,7 @@ pub async fn get_lzzy_vod_detail(collect_type: CollectType) {
 
     let emit_interval = 50i32;
     let urls_len =  urls.len();
-    let chunk_size = (urls_len+ 4) / CHUNK; 
+    let chunk_size = ((urls_len + 4) / CHUNK).max(1);
     let mut handles = vec![];
     let processed_count = Arc::new(AtomicI32::new(0));
 
@@ -163,7 +163,6 @@ pub async fn get_lzzy_vod_detail(collect_type: CollectType) {
         let chunk = chunk.to_vec();
         let app_handle = app_handle.clone();
         let progress = progress.clone();
-        let start_page = start_page;
         let collect_type_num = collect_type_num;
         let emit_interval = emit_interval;
         let total = total;
@@ -194,7 +193,8 @@ pub async fn get_lzzy_vod_detail(collect_type: CollectType) {
                     }
                 };
 
-                if let Err(e) = db.update_collect_page(collect_type_num, (page_index as i32) + start_page).await {
+                let current_page = chunk_start_page + page_index as i32;
+                if let Err(e) = db.update_collect_page(collect_type_num, current_page).await {
                     println!("更新采集页码失败: {}", e);
                 }
 
@@ -226,17 +226,15 @@ pub async fn get_lzzy_vod_detail(collect_type: CollectType) {
                     let current_count = processed_count.fetch_add(1, Ordering::SeqCst) + 1;
                     if current_count % emit_interval == 0 || (page_index == chunk.len() - 1 && current_count == list_len * (page_index as i32 + 1)) {
                         let mut guard = progress.lock().await;
-                        // 计算总处理量(当前处理量 + 已跳过页面的处理量)
-                        let total_processed = current_count + ((start_page - 1) * limit);
-                        guard.current = total_processed + emit_interval;
-                        guard.percent = (total_processed as f32 / total as f32) * 100.0;
+                        guard.current = current_count;
+                        guard.percent = (current_count as f32 / total as f32) * 100.0;
                         guard.message = "正在采集...".to_string();
                         
                         if let Err(e) = db.update_collect_progress(
                             collect_type_num,
-                            total_processed,
+                            current_count,
                             total,
-                            (page_index as i32) + start_page
+                            current_page
                         ).await {
                             println!("更新采集进度失败: {}", e);
                         }

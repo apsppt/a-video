@@ -96,7 +96,7 @@ pub async fn query_videos(query: VodQuery) -> Result<QueryResult, String> {
         count_params.push(Box::new(format!("%{}%", keyword)));
     }
 
-    sql.push_str(" ORDER BY year DESC, updated_at DESC, id DESC LIMIT ? OFFSET ?");
+    sql.push_str(" ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?");
     params.push(Box::new(query.page_size as i64));
     params.push(Box::new(((query.page - 1) * query.page_size) as i64));
     let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|b| b.as_ref()).collect();
